@@ -1,6 +1,0 @@
-"0","pases_hua <- huachipato$accuratePass"
-"0","huachipato2 <- huachipato[order(huachipato$accuratePass, decreasing = TRUE),]"
-"0",""
-"0","#dotchart(huachipato$totalPass, labels = huachipato$partido, cex=0.5, xlab = ""Pases"", ylab = ""Partido"")"
-"0",""
-"0","dotchart(huachipato$totalPass, labels = utf8_encode(huachipato$partido), cex=0.5, xlab = ""Pases"", ylab = ""Partido"")"

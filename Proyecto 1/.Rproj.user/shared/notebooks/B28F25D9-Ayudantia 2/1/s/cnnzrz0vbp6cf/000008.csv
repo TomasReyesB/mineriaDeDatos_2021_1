@@ -1,1 +1,0 @@
-"0","dotchart(huachipato2$accuratePass, labels = utf8_encode(huachipato$partido), main=""Pases Acertados Huachipato"", pch = 16, col=c(""darkblue"",""dodgerblue""),lcolor=""gray90"", cex=0.8, xlab = ""Pases"", ylab = ""Partido"", cex.main=2,cex.lab=1.5)"

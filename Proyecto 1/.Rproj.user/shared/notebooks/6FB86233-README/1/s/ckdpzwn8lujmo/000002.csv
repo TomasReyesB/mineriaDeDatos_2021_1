@@ -1,8 +1,0 @@
-"0",""
-"0",""
-"0","filtro <- filterEvaluator(""IEConsistency"")"
-"0","filtro <- filterEvaluator('determinationCoefficient')"
-"0","filtro <- filterEvaluator('chiSquared')"
-"0","filtro <- filterEvaluator('MDLC') "
-"0",""
-"0",""

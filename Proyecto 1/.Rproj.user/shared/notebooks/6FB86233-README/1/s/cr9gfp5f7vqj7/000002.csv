@@ -1,4 +1,0 @@
-"0","library(GGally)"
-"0",""
-"0","ggpairs(iris_num, aes(col=iris0$Species))"
-"0",""

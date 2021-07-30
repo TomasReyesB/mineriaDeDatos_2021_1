@@ -1,1 +1,0 @@
-"0","dotchart(huachipato2$totalPass, labels = utf8_encode(huachipato$partido), cex=0.5, xlab = ""Pases"", ylab = ""Partido"")"

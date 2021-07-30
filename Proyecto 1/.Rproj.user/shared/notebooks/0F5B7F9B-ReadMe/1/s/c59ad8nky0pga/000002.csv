@@ -1,4 +1,0 @@
-"0",""
-"0","sandwich2 <- transform(sandwich2, Precio = as.numeric(Precio))"
-"0",""
-"0",""
