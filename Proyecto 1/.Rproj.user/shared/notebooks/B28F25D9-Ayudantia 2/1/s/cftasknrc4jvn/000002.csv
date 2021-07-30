@@ -1,0 +1,4 @@
+"0","fh2020_pases = fh2020[,colnames(primer_tiempo2020) %in% c(""equipo"", ""partido"", ""accuratePass"", ""totalPass"", ""precision_pases"")]"
+"0","fh2020_pases = fh2020_pases[order(fh2020_pases$precision_pases, decreasing = TRUE),]"
+"0",""
+"0","fh2020_pases"

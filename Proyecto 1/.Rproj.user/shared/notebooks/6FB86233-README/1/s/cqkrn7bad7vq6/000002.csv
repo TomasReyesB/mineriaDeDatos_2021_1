@@ -1,0 +1,7 @@
+"0","#tSNE"
+"0",""
+"0","library(Rtsne)"
+"0","tsne <- Rtsne(iris_num, dims = 2, perplexity=30, max_iter = 500)"
+"0",""
+"0","tsne$Y %>% as.data.frame() %>% ggplot(aes(V1,V2, col=iris0$Species)) + geom_point()"
+"0",""

@@ -1,0 +1,16 @@
+"0",""
+"0","#nMDS"
+"0","library(MASS)"
+"0","nMDS <- isoMDS(d, k=2) "
+"1","initial  value 4.703287 
+"
+"1","iter   5 value 3.585754
+"
+"1","iter  10 value 3.340021
+"
+"1","final  value 3.313648 
+"
+"1","converged
+"
+"0","nMDS$points %>% as.data.frame() %>% ggplot(aes(V1,V2, col=iris0$Species)) + geom_point()"
+"0",""

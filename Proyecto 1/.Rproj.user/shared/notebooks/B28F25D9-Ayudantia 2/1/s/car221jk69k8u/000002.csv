@@ -1,0 +1,5 @@
+"0","huachipato_pases <- NULL"
+"0",""
+"0","huachipato <- filter(primer_tiempo2020, equipo == ""Huachipato"")"
+"0","huachipato_tiros <- filter(fh2020_tiros, equipo == ""Huachipato"")"
+"0","huachipato_pases <- filter(fh2020_pases, equipo == ""Huachipato"")"
