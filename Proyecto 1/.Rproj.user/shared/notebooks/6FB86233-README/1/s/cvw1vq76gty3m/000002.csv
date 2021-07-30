@@ -1,0 +1,5 @@
+"0",""
+"0","#PCA"
+"0","PCA <- prcomp(iris_num)"
+"0",""
+"0","barplot(PCA$sdev) ## graficamos el aporte de varianza de cada componente principal"

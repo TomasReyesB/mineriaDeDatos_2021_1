@@ -1,0 +1,8 @@
+"0","sandwich2$Ingredientes <- tolower(sandwich2$Ingredientes)"
+"0",""
+"0","dim(sandwich2)"
+"1","[1]"
+"1"," 402"
+"1","   3"
+"1","
+"
