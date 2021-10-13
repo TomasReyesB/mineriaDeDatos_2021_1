@@ -1,0 +1,25 @@
+|variable                 |class     |description |
+|:---|:---|:-----------|
+|track_id                 |character | ID único de la canción |
+|track_name               |character | Nombre de la cancion |
+|track_artist             |character | Artista de la canción |
+|track_popularity         |double    | Popularidad de la canción (0-100) donde más alta es mejor |
+|track_album_id           |character | ID único del álbum |
+|track_album_name         |character | Nombre del álbum de la canción |
+|track_album_release_date |character | Fecha de lanzamiento del álbum |
+|playlist_name            |character | Nombre de la lista de reproducción |
+|playlist_id              |character | ID de lista de reproducción |
+|playlist_genre           |character | Género de lista de reproducción |
+|playlist_subgenre        |character | Subgénero de lista de reproducción |
+|danceability             |double    | La capacidad de baile describe qué tan adecuada es una pista para bailar en función de una combinación de elementos musicales que incluyen el tempo, la estabilidad del ritmo, la fuerza del ritmo y la regularidad general. Un valor de 0.0 es menos bailable y 1.0 es más bailable. |
+|energy                   |double    | La energía es una medida de 0.0 a 1.0 y representa una medida de percepción de intensidad y actividad. Por lo general, las pistas enérgicas se sienten rápidas, ruidosas y ruidosas. Por ejemplo, el death metal tiene mucha energía, mientras que un preludio de Bach tiene una puntuación baja en la escala. Las características de percepción que contribuyen a este atributo incluyen rango dinámico, volumen percibido, timbre, frecuencia de inicio y entropía general. |
+|key                      |double    | La llave general estimada de la pista. Los enteros se asignan a los tonos utilizando la notación estándar de clase de tono. P.ej. 0 = C, 1 = C♯ / D ♭, 2 = D, y así sucesivamente. Si no se detectó ninguna llave, el valor es -1. |
+|loudness                 |double    | El volumen general de una pista en decibelios (dB). Los valores de sonoridad se promedian en toda la pista y son útiles para comparar la sonoridad relativa de las pistas. La sonoridad es la calidad de un sonido que es el principal correlato psicológico de la fuerza física (amplitud). Los valores típicos oscilan entre -60 y 0 db.  |
+|mode                     |double    | El modo indica la modalidad (mayor o menor) de una pista, el tipo de escala de la que se deriva su contenido melódico. Mayor está representado por 1 y menor es 0. |
+|speechiness              |double    | Speechiness detecta la presencia de palabras habladas en una pista. Cuanto más exclusivamente parecida a un discurso sea la grabación (por ejemplo, programa de entrevistas, audiolibro, poesía), más cercano a 1.0 será el valor del atributo. Los valores superiores a 0,66 describen pistas que probablemente estén compuestas en su totalidad por palabras habladas. Los valores entre 0,33 y 0,66 describen pistas que pueden contener tanto música como voz, ya sea en secciones o en capas, incluidos casos como la música rap. Los valores por debajo de 0,33 probablemente representen música y otras pistas que no se parecen al habla. |
+|acousticness             |double    | Una medida de confianza de 0.0 a 1.0 de si la pista es acústica. 1.0 representa una alta confianza en que la pista es acústica. |
+|instrumentalness         |double    | Predice si una pista no contiene voces. Los sonidos “Ooh” y “aah” se tratan como instrumentales en este contexto. Las pistas de rap o de palabra hablada son claramente "vocales". Cuanto más cercano esté el valor de instrumentalidad a 1.0, mayor será la probabilidad de que la pista no tenga contenido vocal. Los valores superiores a 0,5 están destinados a representar pistas instrumentales, pero la confianza es mayor a medida que el valor se acerca a 1,0. |
+|liveness                 |double    | Detecta la presencia de una audiencia en la grabación. Los valores de vivacidad más altos representan una mayor probabilidad de que la pista se interprete en vivo. Un valor superior a 0,8 proporciona una gran probabilidad de que la pista esté activa. |
+|valence                  |double    | Una medida de 0.0 a 1.0 que describe la positividad musical que transmite una pista. Las pistas con valencia alta suenan más positivas (p. Ej., Feliz, alegre, eufórico), mientras que las pistas con valencia baja suenan más negativas (p. Ej., Triste, deprimido, enojado). |
+|tempo                    |double    | El tempo global estimado de una pista en pulsaciones por minuto (BPM). En terminología musical, el tempo es la velocidad o el ritmo de una pieza determinada y se deriva directamente de la duración media del tiempo. |
+|duration_ms              |double    | Duración de la canción en milisegundos |

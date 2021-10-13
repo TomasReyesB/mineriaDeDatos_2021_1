@@ -1,0 +1,387 @@
+---
+title: "Proyecto N°2 - Spotify Playlist"
+output: github_document
+authors: Juan Lisboa, Tomás Reyes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(cluster, quietly = TRUE)
+library(mclust, quietly = TRUE)
+library(tidyverse, quietly = TRUE)
+library(utils, quietly = TRUE)
+```
+
+## Cargando los datos
+
+Para cargar los datos a analizar se emplea la función **load()**, la cual acepta como parámetro la dirección en el directorio del archivo a cargar, sin embargo, como en este caso el archivo **beats.RData** se encuentra en el directorio root del proyecto, solo se indica el nombre del archivo.
+
+```{r cargar datos}
+
+load("beats.RData")
+
+```
+
+## Preprocesamiento de los datos
+Una vez cargados los datos, es necesario realizar una limpieza de estos, para así poder realizar el posterior análisis de mejor manera y sin errores en los procesos de clustering debido a datos faltantes por ejemplo.
+Así, lo primero corresponde a escoger solo aquellas columnas que sean relevantes para el caso de estudio, las que en este caso son:
+  -**Danceability**
+  -**Energy**
+  -**Key**
+  -**Loudness**
+  -**Mode**
+  -**Speechiness**
+  -**Acousticness**
+  -**Instrumentalness**
+  -**Liveness**
+  -**Valence**
+  -**Tenpo**
+Además, también se deben conservar las columnas **track_id** para identificar la canción, **duration_ms** para luego determinar el largo de la playlists a crear, y finalmente **track_name** y **artist_name**, para poder entregar una presentación final de la playlist un tanto más agradable de lo que sería presentar sólamente los nombres de las canciones. Estas columnas serán guardadas en un nuevo dataframe llamado **songs**, luego se muestra un resumen de este.
+```{r selección de columnas}
+
+songs <- beats[, c(1,8:19, 23, 27)]
+
+summary(songs)
+
+```
+Luego, es necesario verificar la presencia de valores faltantes que serán eliminados del dataframe. Para esto se utiliza la función **summarize_all**, la cual, de acuerdo a los argumentos entregados, cuenta la cantidad de valores NA en cada columna, luego, este resutado se guarda en un nuevo dataframe auxiliar llamado **aux**.
+```{r eliminar NAs}
+#Valores faltantes se reemplazan por NA
+songs[songs == ''] <- NA
+
+#se verifica la presencia de NAs
+aux <- songs %>% summarise_all(funs(sum(is.na(.))))
+
+head(aux)
+
+```
+Como no se detecta le presencia de valores NA, se prosigue con la filtración y remoción de datos duplicados. Para esto se utilizará el campo **track_id**, logrando así eliminar todas las canciones exacatamente iguales duplicadas, sin eliminar demás, cosa que ocurriría al eliminar duplicados de acuerdo al nombre de la canción por ejemplo.
+
+```{r eliminar duplicados}
+
+songsNoDup <- songs[!duplicated(songs$track_id),]
+
+```
+A continuación se muestra la cantidad de canciones en el dataframe **songs**, con duplicados, y en el dataframe **songsNoDup**, sin duplicados, entre los que se puede ver una diferencia de 2525 canciones.
+```{r comprobar duplicados}
+
+nrow(songs)
+nrow(songsNoDup)
+
+```
+Como los valores restantes de interés son numéricos, y en el caso de los campos de tipo character, estos no tienen relevancia en el análisis de clustering. Por esto, luego de revisar el archivo **lista_variables**, donde se incluye una descripción de cada columna de los datos originales, es que los datos numéricos se transformarán a **double**, meramente para respetar la naturaleza de estos y evitar posibles variaciones indeseadas en el análisis.
+
+```{r transformar variables double}
+
+songsNoDup$danceability <- as.double(as.character(songsNoDup$danceability))
+songsNoDup$energy <- as.double(as.character(songsNoDup$energy))
+songsNoDup$key <- as.double(as.character(songsNoDup$key))
+songsNoDup$loudness <- as.double(as.character(songsNoDup$loudness))
+songsNoDup$mode <- as.double(as.character(songsNoDup$mode))
+songsNoDup$speechiness <- as.double(as.character(songsNoDup$speechiness)) 
+songsNoDup$acousticness <- as.double(as.character(songsNoDup$acousticness))
+songsNoDup$instrumentalness <- as.double(as.character(songsNoDup$instrumentalness))
+songsNoDup$liveness <- as.double(as.character(songsNoDup$liveness))
+songsNoDup$valence <- as.double(as.character(songsNoDup$valence))
+songsNoDup$tempo <- as.double(as.character(songsNoDup$tempo))
+songsNoDup$duration_ms <- as.double(as.character(songsNoDup$duration_ms))
+
+```
+
+Luego, se realiza el mismo procedimiento con el resto de las columnas previamente seleccionadas.
+```{r transformar variables chars}
+
+songsNoDup$track_id <- as.character(songsNoDup$track_id)
+songsNoDup$track_name <- as.character(songsNoDup$track_name)
+songsNoDup$artist_name <- as.character(songsNoDup$artist_name)
+
+```
+
+Luego de estas transformaciones, es necesario volver a comprobar la presencia de valores faltantes NA en el dataframe **songsNoDup** y eliminarlos.
+```{r eliminar NAs 2}
+
+songsNoDup <- songsNoDup %>% filter(!(is.na(key)|is.na(danceability)|is.na(energy)|is.na(loudness)|is.na(mode)|is.na(speechiness)))
+
+songsNoDup <- songsNoDup %>% filter(!(is.na(acousticness)|is.na(instrumentalness)|is.na(liveness)|is.na(valence)|is.na(tempo)|is.na(duration_ms)))
+
+summary(songsNoDup)
+```
+
+## Muestreo aleatorio
+Para realizar el muestreo aleatorio de los datos se utilizará la función **sample()** de R base, a la cual se le debe entregar como argumento el largo de las filas que se obtendrán, así como también la cantidad de datos que la muestra deberá contener, en este caso se indican 25000, que serán guardados en un nuevo dataframe llamado **sampleSongs**. Luego, se muestra un resumen de los datos en este nuevo dataframe recién creado.
+```{r}
+set.seed(500)
+
+sampleSongs <- songsNoDup[sample(nrow(songsNoDup), 25000),]
+
+summary(sampleSongs)
+
+```
+## Escalamiento de los datos
+Para poder escalar de manera correcta los datos es que se separará el dataframe en dos nuevos dataframes, uno con las variables numéricas y otro con las de tipo character.
+
+```{r separar dataframe}
+
+songsChar <- sampleSongs %>% 
+  select(c("artist_name", "track_id", "track_name"))
+
+songsNum <- sampleSongs %>%
+  select(c("key", "danceability", "energy", "loudness", "mode", "speechiness", "acousticness", "instrumentalness", "liveness", "valence", "tempo", "duration_ms"))
+
+```
+
+Una vez realizado esto ya se pueden escalar los datos para su posterior análisis de clustering.
+
+```{r escalar data}
+
+songsScale <- data.frame(sapply(songsNum, scale))  
+
+```
+
+# Procesamiento de los Datos
+
+## Análisis de Cluster
+
+Con los datos ya escalados, es posible comenzar con el análisis de clusters. Para un primer acercamiento se utilizarán 10 clusters, lo que luego será modificado acorde a los resultados obtenidos.
+
+```{r k means}
+
+modelo_kmeans10 <- kmeans(songsScale, centers = 10)
+
+songsScale$clus <- modelo_kmeans10$cluster %>% as.factor()
+
+ggplot(songsScale, aes(liveness, energy, color=clus)) +
+  geom_point(alpha=0.5, show.legend = T) +
+  theme_bw()
+
+ggplot(songsScale, aes(acousticness, speechiness, color=clus)) +
+  geom_point(alpha=0.5, show.legend = T) +
+  theme_bw()
+
+ggplot(songsScale, aes(loudness, instrumentalness, color=clus)) +
+  geom_point(alpha=0.5, show.legend = T) +
+  theme_bw()
+
+
+```
+
+En los gráficos se puede ver que los clústers son desordenados y esparcidos, por lo que K = 10 no parece ser una buena elección, y suamado a que buscamos que las canciones similares estén en el mismo cluster, y por lo tanto cercanas entre si, es que se realizará una análisis de la evolución de la suma de cuadrados de la distancia entre los puntos de un mismo cluster a medida que varía K, a fin de encontrar el mejor valor de este.
+
+```{r suma cuadrados}
+
+kmeansSumaCuadrados <- numeric(30)
+
+for(k in 1:30){
+  modelo <- kmeans(songsScale, centers = k)
+  kmeansSumaCuadrados[k] <- modelo$tot.withinss
+}
+
+plot(kmeansSumaCuadrados)
+
+```
+
+De este gráfico se puede deducir que desde alrededor de K = 7 el cambio resulta no ser muy significativo, por lo que este valor será candidato a utilizarse.
+
+## Coeficiente de silueta para encontrar el mejor valor de K
+
+Para confirmar o rechazar la propuesta K = 7 es que se realizará un análisis del coeficiente de silueta para encontrar el mejor valor de K.
+```{r coeficiente silueta}
+
+coefSil=numeric(30)
+
+for (k in 2:30){
+  modelo <- kmeans(songsScale, centers = k)
+  temp <- silhouette(modelo$cluster,dist(songsScale))
+  coefSil[k] <- mean(temp[,3])
+}
+tempDF=data.frame(CS=coefSil,K=c(1:30))
+
+ggplot(tempDF, aes(x=K, y=CS)) + 
+  geom_line() +
+  scale_x_continuous(breaks=c(1:30))
+
+```
+
+Este gráfico rechaza categóricamente el valor de K = 7 anteriormente propuesto, e inlcuso, indica que el mejor valor K para maximizar el coeficiente de silueta corresponde a 2, esto es, hacer 2 clusters de datos, lo que en este caso va completamente contra la intuición, es por esto que se aplicarán otros métodos de clustering al primero de los clusters resultantes con K = 2.
+Luego se grafican los resultados obtenidos se acuerdo a diferentes combinaciones de variables para intentar distinguir, dentro de lo posible, la agrupación realizada.
+```{r kmeans 2 clusters}
+
+modeloKmeans2 = kmeans(songsScale, centers = 2)
+
+songsScale$clus <- modeloKmeans2$cluster %>% as.factor()
+
+ggplot(songsScale, aes(liveness, energy, color=clus)) +
+  geom_point(alpha=0.5, show.legend = T) +
+  theme_bw()
+
+ggplot(songsScale, aes(acousticness, speechiness, color=clus)) +
+  geom_point(alpha=0.5, show.legend = T) +
+  theme_bw()
+
+ggplot(songsScale, aes(loudness, instrumentalness, color=clus)) +
+  geom_point(alpha=0.5, show.legend = T) +
+  theme_bw()
+
+
+```
+
+A continuación, es necesario extarer los datos pertenecientes al primer cluster de este modelo, con el fin de analizarlos con mayor detalle, estos serán guardados en un nuevo dataframe llamado **primerCluster**.
+
+```{r primerCluster}
+
+primerCluster <- songsScale %>% filter(songsScale$clus == 1)
+summary(primerCluster)
+
+```
+Una vez obtenidos los datos pertenecientes al primer cluster del modelo K-means implementado, es posible realizar el análisis de clusters GMM, con el fin de profundizar en el análisis de estos. Este modelo será guardado en la lista **modeloKmeansGMM**.
+
+```{r kmeans GMM}
+
+modeloKmeansGMM <- Mclust(primerCluster)
+plot(modeloKmeansGMM, what = 'classification')
+
+```
+
+Luego, con la función **summary()**, se puede visualizar la cantidad de clusters obtenidos al aplicar este método al primer cluster obtenido.
+```{r summary Kmeans-GMM}
+
+summary(modeloKmeansGMM)
+
+```
+Como se puede ver, al realizar el análisis en este orden no se logra encontrar nueva información, ya que el algoritmo GMM no es capaz de discernir nuevos clusters dentro del cual fue entregado.
+
+## Clusterización GMM
+Debido a lo previamente mencionado es que se decició realizar el proceso en orden inverso, esto es, primero realizar clusterización GMM y luego elegir uno de los clusters resultantes para apricarle el proceso de clusterización K-means. Este modelo será guardado en una nueva lista llamada **modeloGMM**.
+
+```{r modelo GMM}
+
+modeloGMM <- Mclust(songsScale)
+plot(modeloGMM, what = 'classification')
+
+```
+
+El gráfico de la clusterización no deja muy claras las cosas, aunque ayuda a distinguir a muy bajo nivel la división entre los clusters en la data de estudio. Por esto es que se decidió utilizar la función **summary()** nuevamente, para obtener la cantidad de clusters así como también cuántos elementos posee cada uno.
+```{r summary modelo GMM}
+
+summary(modeloGMM)
+
+```
+Luego, es necesario asignar a cada canción el cluster al que pertenece, para esto se crea un nuevo dataframe llamado **sampleSongsClusters**, en donde se agregan todas las columnas del dataframe **sampleSongS**, además de una extra correspondiente al cluster al que cada elemento pertenece.
+```{r asignación clusters}
+
+sampleSongsClusters <- NULL
+clusters <- modeloGMM$classification
+
+sampleSongsClusters <- cbind(sampleSongs, clusters)
+
+```
+
+Ahora es cuando se vuelve necesario escoger la canción para la creación de la playlist solicitada. Para esto, se seleccionará una canción al azar desde la muestra de datos, y luego se procederá a un análisis de clustering con K-means para una mejor segmentación.
+
+```{r selección canción}
+
+cancion <- sampleSongsClusters[sample(nrow(sampleSongsClusters), 1),]
+
+print(cancion$artist_name)
+print(cancion$track_name)
+print(cancion$clusters)
+```
+Como se puede ver la canción escogida pertenece al cluster N°3, por lo que se trabajará con este. Sin embargo, se deja el código implementado de manera tal que funcione con cualquier canción, independiente del cluster al que pertenece. De esta manera, se guarda el cluster al que la canción escogida pertenece en un nuevo dataframe llamado **cluster**.
+
+```{r}
+
+cluster <- sampleSongsClusters %>% filter(sampleSongsClusters$clusters == cancion$clusters)
+summary(cluster)
+
+```
+Luego, es necesario realizar un análisis de la cantidad de clusters que entreguen las mejores métricas al momento de aplicar el método k-means, por lo que se realiza un análisis de coeficiente de silueta, utilizando las variables numéricas de **cluster**, las cuales fueron guardadas en un uevo dataframe llamado **clusterNum**.
+```{r coeficiente silueta cluster}
+
+clusterNum <- cluster %>% select(c("key", "danceability", "energy", "loudness", "mode", "speechiness", "acousticness", "instrumentalness", "liveness", "valence", "tempo", "duration_ms"))
+
+coefSil=numeric(30)
+
+for (k in 2:30){
+  modelo <- kmeans(clusterNum, centers = k)
+  temp <- silhouette(modelo$cluster,dist(clusterNum))
+  coefSil[k] <- mean(temp[,3])
+}
+tempDF=data.frame(CS=coefSil,K=c(1:30))
+
+ggplot(tempDF, aes(x=K, y=CS)) + 
+  geom_line() +
+  scale_x_continuous(breaks=c(1:30))
+
+```
+
+De acuerdo a lo observado en el gráfico, se decidió utilizar k = 5 ya que entrega un mayor nivel de segmentación, a la vez que no afecta en gran manera el valor del coeficiente de silueta, que se logra mantener en valores bastante cercanos al máximo obtenido con K = 2.
+
+Para confirmar la teoría es que se realizó un análisis de la suma de cuadrados, desde 1 hasta 30 clusters, para obtener una mejor visualización se graficaron estos valores, mostrados a continuación.
+
+```{r suma cuadrados 3}
+
+kmeansSumaCuadradoscluster <- numeric(30)
+
+for(k in 1:30){
+  modelo <- kmeans(clusterNum, centers = k)
+  kmeansSumaCuadradoscluster[k] <- modelo$tot.withinss
+}
+
+plot(kmeansSumaCuadradoscluster)
+
+```
+
+Como se puede ver, el "codo" o punto de quiebre del gráfico se encuentra entre K = 5 y K = 6, lo que refuerza lo propuesto anteriormente. Así, se decidió por realizar un análisis K-means con K = 5 en el cluster de la canción escogida.
+
+```{r kmeans cluster k 5}
+
+modeloKmeansCluster <- kmeans(clusterNum, centers = 5)
+
+cluster$clusters <- NULL
+cluster$clusters <- modeloKmeansCluster$cluster
+
+cancionNuevoCluster <- cluster %>% filter(cluster$track_id == cancion$track_id)
+
+KmeansCluster <- cluster %>% filter(cluster$clusters == cancionNuevoCluster$clusters)
+
+```
+
+Ahora es necesario encontrar el cluster al que fue asignada la canción seleccionada, para luego comenzar a elegir canciones de ese mismo cluster y agregarlas a la playlist, que será almacenada en un nuevo dataframe llamado **Playlist**, a la cual se dejarán de agregar canciones una vez que la variable **contadorTiempo** sea mayor a 10800000 milisegundos. Al final de este proceso se muestra el tiempo total en milisegundos que dura la playlist, meramente para confirmar que se cumpla el requisito de extensión mínima de 3 horas, equivalente a 10800000 milisegundos.
+
+```{r playlist}
+
+cancionNuevoCluster <- cluster %>% filter(cluster$track_id == cancion$track_id)
+
+Playlist <- NULL
+
+contadorTiempo <- cancion$duration_ms
+tiempoMax <- 10800000
+
+Playlist <- rbind.data.frame(Playlist, cancion)
+
+while (contadorTiempo <= tiempoMax) {
+  
+  cancionElegida <- KmeansCluster[sample(nrow(KmeansCluster), 1),]
+  
+  if(any(Playlist$track_id == cancionElegida$track_id)){
+    next
+  }
+  
+  Playlist <- rbind.data.frame(Playlist, cancionElegida)
+  
+  contadorTiempo = contadorTiempo + as.numeric(cancionElegida$duration_ms) 
+}
+
+print(contadorTiempo)
+```
+
+La lista de reprodución creada se muestra a continuación.
+```{r print playlist}
+
+PlaylistPrint <- Playlist %>% select(c("track_name"))
+
+
+head(as.matrix.data.frame(PlaylistPrint), nrow(PlaylistPrint))
+
+```
+
