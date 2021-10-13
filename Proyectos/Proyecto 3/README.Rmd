@@ -1,0 +1,379 @@
+---
+title: "Proyecto N°3"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidymodels)
+library(pROC)
+library(e1071)
+
+```
+
+# Análisis de deportes de resistencia
+
+En el presente proyecto se busca clasificar las actividades hechas por deportistas de resistencia, que estos rastrean utilizando dispositivos digitales. Es importante clasificar de buena manera estas actividades ya que se mantienen sistemas de ranking y premios que se pueden ver gravemente afectados por actividades mal ingresadas por los usuarios, ya sea de manera ccidental o intencionada, como por ejemplo registrar una actividad de bicicleta como de running para aumentar la distancia recorrida en el ranking o la velocidad promedio del usuario.
+
+El objetivo principal de este proyecto es diferenciar las actividades realizadas en bicicleta o a pie de acuerdo a características como la distancia recorrida, la velocidad promedio, entre otros atributos capturados por los dispositivos de rastreo como celulares u otros wearables. Como objetivo secundario se plantea identificar las actividades que fueron registradas errónameante por los usuarios.
+
+## Cargar datos
+
+Los datos a analizar constan de 167615 actividades con 17 variables cada una, los que serán almacenados en un data frame llamado **actividadesRaw**. Luego se muestra un resumen del dataset y sus variables con la función **summary()**
+
+```{r cargando datos}
+
+actividadesRaw <- readRDS("endurance.rds")
+actividadesRaw %>% summary()
+
+```
+
+## Limpieza de datos
+
+Antes de comenzar con el análisis de los datos y creación de modelos de clasificación de actividades, primero es necesario realizar una limpieza de estos, así como también verificar su integridad, esto es, que no hayan datos faltantes y escalarlos en la medidia de lo posible para evitar bias en los cálculos posteriores.
+
+Primero se obtendrán todos los tipos de actividades que hay en el dataset, para lo cual se utilizará la función **unique()**. Luego se eliminarán las columnas **id** y **athlete** ya que corresponden a identificadores de actividad y usuario, respectivamente. Además también se eliminarán las variables **device_name**, **start_date_local**, **records** y **has_heartrate**.  Sin embargo, para no modificar el dataset original es que se hará una copia de este, llamada **actividades**. Además, se crea una segunda copia de este dataset, que leugo se tuilizará para determinar aquellas que fueron erróneamente catalogadas.
+
+```{r limpiando datos}
+
+actividades <- actividadesRaw
+actividades2 <- actividadesRaw
+
+actividades$type %>% unique()
+actividades$id <- NULL
+actividades$athlete <- NULL
+actividades$device_name <- NULL
+actividades$start_date_local <- NULL
+actividades$records <- NULL
+actividades$has_heartrate <- NULL
+
+actividades2$athlete <- NULL
+actividades2$device_name <- NULL
+actividades2$start_date_local <- NULL
+actividades2$records <- NULL
+actividades2$has_heartrate <- NULL
+
+```
+
+Ahora corresponde cambiar las variables que son de tipo character a numéricas, como las referentes a la elevación, velocidad máxima y velocidad promedio. También se categorizarán las actividades de acuerdo a como fueron realizadas, convirtiendo la variable **type** a un factor que será 1 para las acividades en bicicleta y 0 para las actividades a pie.
+
+```{r conversion a numericas}
+
+actividades$elev_low <- as.numeric(actividades$elev_low)
+actividades$elev_high <- as.numeric(actividades$elev_high)
+actividades$max_speed <- as.numeric(actividades$max_speed)
+actividades$average_speed <- as.numeric(actividades$average_speed)
+
+actividades2$elev_low <- as.numeric(actividades$elev_low)
+actividades2$elev_high <- as.numeric(actividades$elev_high)
+actividades2$max_speed <- as.numeric(actividades$max_speed)
+actividades2$average_speed <- as.numeric(actividades$average_speed)
+
+actividades$typeCode <- (actividades$type == "Ride" | actividades$type == "EBikeRide") %>% as.numeric()
+actividades2$typeCode <- (actividades$type == "Ride" | actividades$type == "EBikeRide") %>% as.numeric()
+
+actividades$type <- NULL
+actividades2$type <- NULL
+
+```
+
+Luego, se procederá a la detección de datos faltantes o NAs en cada una de las variables del dataset.      
+
+```{r detectando NAs}
+
+columnNames <- c("calories", "distance", "elev_low", "elev_high", "max_speed", "moving_time", "elapsed_time", "average_speed", "total_elevation_gain", "typeCode")
+vectorNA <- vector(mode = "list" , 10)
+
+for (i in 1:ncol(actividades)) {
+  
+  vectorNA[i] <- sum(is.na(actividades[, i]))
+    
+}
+
+datasetNA <- rbind.data.frame(columnNames, vectorNA)
+
+datasetNA %>% str()
+
+```
+
+Como se puede ver, todos los valores NA encontrados pertenecen a las variables referentes a la altura, por lo que se analizarán estas actividades para determinar alguna característica común y tomar acciones a partir de estas.
+
+```{r eliminando NAs}
+
+actividadesNA <-actividades %>% filter(is.na(actividades$elev_high))
+
+actividadesNA %>% summary()
+
+```
+Se eliminarán todas las actividades con **distance** igual a 0, ya que no aportan valor al análisis.
+
+```{r eliminar distancias 0}
+
+actividadesNA[actividadesNA == 0] <- NA
+
+actividadesNA %>% summary()
+
+```
+
+Una vez que todos las entradas con valores igual a 0 se han convertido en NAs, se eliminarán para así obtener las actividades que si aportan información pero tienen NA en la variable **elev_gain**.
+
+```{r eliminar nas exploratorio}
+
+actividadesNA$elev_low <- NULL
+actividadesNA$elev_high <- NULL
+
+actividadesNA <- na.omit(actividadesNA)
+
+actividadesNA %>% str()
+
+```
+
+Al eliminar las activiades con datos igual a 0 solo quedan 3 entradas que si tienen sus datos completos a excepción de **elev_high** y **elev_low**, por lo que eliminarlas no implica una gran impacto en el análisis del dataset original. Por esto es que se decide eliminar todas las actividades con datos faltantes del dataframe **actividades**. 
+```{r eliminar nas}
+
+actividades <- na.omit(actividades)
+actividades2 <- na.omit(actividades2)
+
+actividades %>% summary()
+
+```
+
+Una vez que se han eliminado las entradas con datos faltantes, es necesario realizar un simple análisis de outliers, ya que como se ve en las tablas entregadas por la función **summary()**, existen datos atípicos en cada una de las variables. Para visualizarlo de mejor manera se utilizarán gráficos boxplot.
+
+```{r boxplot sin filtrar}
+
+for (i in 1:(ncol(actividades) - 1)) {
+  
+  boxplot(actividades[, i])
+    
+}
+
+```
+
+Los gráficos de boxplot comprueban lo mencionado acerca de la presencia de datos atípicos en cada una de las variables, por lo que se aplicarán filtros a cada una de estas para así eliminar las actividades que sean anormales.  
+
+```{r eliminando datos atipicos}
+
+actividades <- filter(actividades ,actividades$calories < 2500)
+actividades <- filter(actividades ,actividades$distance < 50000)
+actividades <- filter(actividades ,actividades$elev_low < 2500)
+actividades <- filter(actividades ,actividades$elev_low > -1000)
+actividades <- filter(actividades ,actividades$elev_high < 5000)
+actividades <- filter(actividades ,actividades$max_speed < 50)
+actividades <- filter(actividades ,actividades$moving_time < 25000)
+actividades <- filter(actividades ,actividades$elapsed_time < 15000)
+actividades <- filter(actividades ,actividades$average_speed < 30)
+actividades <- filter(actividades ,actividades$total_elevation_gain < 2000)
+
+actividades2 <- filter(actividades2 ,actividades2$calories < 2500)
+actividades2 <- filter(actividades2 ,actividades2$distance < 50000)
+actividades2 <- filter(actividades2 ,actividades2$elev_low < 2500)
+actividades2 <- filter(actividades2 ,actividades2$elev_low > -1000)
+actividades2 <- filter(actividades2 ,actividades2$elev_high < 5000)
+actividades2 <- filter(actividades2 ,actividades2$max_speed < 50)
+actividades2 <- filter(actividades2 ,actividades2$moving_time < 25000)
+actividades2 <- filter(actividades2 ,actividades2$elapsed_time < 15000)
+actividades2 <- filter(actividades2 ,actividades2$average_speed < 30)
+actividades2 <- filter(actividades2 ,actividades2$total_elevation_gain < 2000)
+
+actividades$typeCode <- as.factor(actividades$typeCode)
+actividades2$typeCode <- as.factor(actividades2$typeCode)
+
+```
+
+```{r boxplot con filtro}
+
+for (i in 1:(ncol(actividades) - 1)) {
+  
+  boxplot(actividades[, i])
+    
+}
+
+```
+
+En estos gráficos ya se puede observar una clara diferencia con los anteriores, y con un bias mucho menor por la reducción del ruido que los datos atípicos generaban.
+
+Finalmente, antes de comenzar a entrenar modelos de clasificación, es necesario escalar los datos para evitar bias por la diferencia en las magnitudes de cada variable. Además, se crea una copia del dataset **actividades**, llamado **actividadesCopia**, el cual será utilizado más tarde para determinar las actividades que fueron etiquetadas erróneamente.
+
+```{r escalamiento}
+tipos <- data.frame(actividades$typeCode)  
+
+actividades <-data.frame(scale(actividades[0:9]))  
+
+actividades <- cbind.data.frame(actividades, tipos)
+
+actividadesCopia <- actividades
+
+```
+
+# Modelo con máquinas de soporte vectorial
+
+Como se trata de un problema de clasificación con dos posibles categorías, es que se decidió por realizar un modelo de Máquinas de Soporte Vectorial, e iterar en el grado del vector de soporte con tal de encontrar la mejor separáción de las actividades en su respectivo espacio. Antes de esto, es necesario realizar una separación del dataset **actividades**, en dos nuevos datasets, uno llamado **actividadesTrain** para entrenar el modelo, y otro llamado **actividadesTest** que se utilizará para testear el modelo y determinar su precisión luego de haber sido entrenado.
+
+```{r separacion dataset }
+
+actividadesSample <- actividades[sample(nrow(actividades), 25000),]
+
+set.seed(500)
+actividadesSplit <- initial_split(actividadesSample, prop = 0.7)
+
+actividadesTrain  <- training(actividadesSplit)
+actividadesTest   <- testing(actividadesSplit)
+
+```
+
+Ahora prosigue crear la receta para la máquina de soporte vectorial, inspirada en el ejemplo de clases, que será nombrada **modeloSVM**. Esta función creará, entrenará y testeará un modelo SVM del grado que se le indique en el argumento.
+
+```{r receta}
+receta <- 
+  recipe(actividades.typeCode ~ ., data = actividadesTrain) 
+
+receta
+
+```
+
+Luego se crea la función mencionada. Esta se compone de tres partes, en primer lugar se crea el modelo de máquinas de sopote vectorial con el grado especificado en el argumento y se almacena en **modelo**, luego se entrena a este modelo y esta nueva versión se guarda en **modeloFit**, el paso siguiente es realizar predicciones basadas en los datos de testeo previamente apartados, las que se guardan en **modeloPrediccion**, finalmente se retorna el valor del área bajo la curva AUC de la curva, valga la redundancia, ROC de este modelo.
+
+```{r receta SVM}
+library(kernlab)
+
+modeloSVM <- function(grado){
+  
+  modelo <- svm_poly(degree = grado)    %>%
+            set_engine("kernlab")       %>%
+            set_mode("classification")  %>%
+            translate()
+  
+  modeloFit <-  workflow()              %>%
+                add_model(modelo)       %>%
+                add_recipe(receta)      %>%
+                fit(data = actividadesTrain)
+  
+  modeloPrediccion <- predict(modeloFit, actividadesTest, type = "prob")  %>%
+                      bind_cols(actividadesTest)
+  
+  modeloPrediccion %>% roc_auc(truth = actividades.typeCode, .pred_0)
+  return(modeloPrediccion %>% roc_auc(truth = actividades.typeCode, .pred_0))
+}
+
+```
+
+Así, ahora es posible realizar análisis de los datos con modelos de Máquinas de Soporte Vectorial de diferentes grados, lo que facilitará en gran medida la elección del mejor para el modelo.
+
+```{r SVM grado 1}
+
+modeloSVM(1)
+
+```
+
+Como se puede ver, el modelo ya entrega resultados que, si bien no excelentes, son más que aceptables, sin embargo, se realizarán pruebas con otros modelos utilizando ajustes polinomiales de grado 2 y 3, para verificar si es que utilizar alguno de estos sería provechoso.Primero se muestra en modelo de segundo grado.
+
+```{r SVM grado 2}
+
+modeloSVM(2)
+
+```
+
+Y luego el modelo de tercer grado.
+
+```{r SVM grado 3}
+
+modeloSVM(3)
+
+```
+
+Al aumentar el grado de la curva utilizada para la separación de las actividades se obtuvo un incremento de más de un 5%, con lo cual los resultados ya son considerados como muy buenos, con un AUC sobre el 99.9% para el modelo de grado 2, mientras que el de grado 3 también entrega un AUC de un 99.9%. En esta sección es importante destacar que se realizaron múltiples pruebas entre estos modelos y el de grado 3 siempre entregó un AUC mayor o igual al de grado 2.
+
+# Modelo Naive Bayes
+
+Por curiosidad se decidió realizar un modelo utilizando el método Naive Bayes, para esto, primero se debe realizar una aproximación lineal de las variables independientes, la cual fue guardada en un dataset llamado **DPLinear**.
+
+```{r naive bayes modelo}
+
+DP_model <-  naiveBayes(actividades.typeCode ~ calories + distance + elev_low +
+                          elev_high + max_speed + moving_time + elapsed_time +
+                          average_speed + total_elevation_gain,
+                          data = actividadesTrain)
+
+```
+
+Luego corresponde evaluar el modelo, obtener su curva ROC y posteriormente su AUC.
+
+```{r naive bayes predictions}
+
+PredictionModel <- predict(DP_model, newdata = actividadesTest, type = "raw")
+
+actividadesTest$prob <- PredictionModel[, 2]
+
+curvaROC <- roc(actividades.typeCode ~ prob, data = actividadesTest)
+
+plot(curvaROC)
+
+```
+
+
+```{r naive bayes roc auc}
+
+auc(curvaROC)
+
+```
+
+Como se puede ver, este modelo también es bastante bueno en sus predicciones, con un AUC de un 92.75%, ubicándose así sobre el modelo SVM de grado 1 sin embargo, no es suficiente para superar a los modelos de grado 2 y 3 de SVM que se encuentran mucho más cercanos al 100%. Por esto es que se decidió escoger al modelo de grado 3 como el apropiado para determinar si las actividades se han catalogado de manera correcta o no al ser ingresadas en las distintas aplicaciones de rastreo de actividades, ya que como el objetivo secundario es identificarlas, se requiere de una herramienta que permita hacerlo con la mayor precisión posible. Cabe destacar que no se intentaron modelos de grado 4 o superior debido a limitaciones de hardware.
+
+
+# Identificación de actividades calificadas erróneamente
+
+Luego de haber determinado el modelo a utilizar, este se utilizará para verificar si es que las actividades fueron catalogadas correctamente por los usuarios que las ingresaron, las cuales serán guardadas en un nuevo dataframe llamado **actividadesErroneas**. Aunque primero es necesario entrenar el modelo y realizar las predicciones del dataset **actividadesCopia**, el cual comprende los datos previamente limpiados y escalados.
+
+```{r modelo final y predicciones}
+
+modelo <- svm_poly(degree = 3)    %>%
+          set_engine("kernlab")       %>%
+          set_mode("classification")  %>%
+          translate()
+
+modeloFit <-  workflow()              %>%
+              add_model(modelo)       %>%
+              add_recipe(receta)      %>%
+              fit(data = actividadesTrain)
+
+modeloPrediccion <- predict(modeloFit, actividadesCopia, type = "prob")  %>%
+                    bind_cols(actividadesCopia)
+
+```
+
+Una vez obtenidas las probabilidades de pertenencia de las actividades a cada tipo de actividad, se puede determinar a qué tipo pertenece cada una comparando sus probabilidades, si la probabilidad de pertenencia a tipo 0 es mayor a la de tipo 1, entonces la actividad se cataloga como actividad hecha a pie, y si ocurre lo contrario entonces se cataloga como hecha en bicicleta. Esta calificación será guardada en el dataframe previamente creado llamado **actividades2**, ya que este contiene los IDs de las actividades, con lo que luego podrán ser identificadas en el dataset original.
+
+```{r asignacion categoria }
+
+actividades2$prediccion <- ifelse(modeloPrediccion$.pred_0 >= modeloPrediccion$.pred_1, 0, 1)
+
+```
+
+Luego se pueden seleccionar aquellas actividades erróneamente categorizadas comparando las variables **actividades.typeCode** y **prediccion** en el dataframe **actividades2**, las cuales serán guardadas en el dataset **actividadesErroneas**.
+
+```{r seleccion erroneas}
+
+actividadesErroneas <- actividades2 %>% filter(typeCode != prediccion)
+
+```
+
+Para comprobar la correcta selección de las actividades catalogadas erróneamente se muestran los primeros 20 elementos del dataset **actividadesErroneas**, para una rápida inspección visual. 
+
+```{r inspeccion visual}
+
+head(actividadesErroneas, n = 20)
+
+```
+
+Como se puede ver, las 20 actividades mostradas tienen una predicción diferente a su tipo original, lo que sumado a una rápida inspección visual del dataframe, se deduce una correcta selección de estas actividades mal catalogadas en base a la predicción realizada. Por último, se muestra el número de actividades que el modelo determinó que fueron catalogadas erróneamente.
+
+```{r total erróneas}
+
+nrow(actividadesErroneas)
+
+```
+
+
