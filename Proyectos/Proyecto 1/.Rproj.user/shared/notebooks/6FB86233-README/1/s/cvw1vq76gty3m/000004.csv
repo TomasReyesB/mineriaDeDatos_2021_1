@@ -1,2 +1,0 @@
-"0",""
-"0","predict(PCA) %>% as.data.frame() %>%  ggplot(aes(PC1,PC2, col=iris0$Species)) + geom_point()"

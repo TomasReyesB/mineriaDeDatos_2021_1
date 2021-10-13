@@ -1,6 +1,0 @@
-"0","sandwich <- data"
-"0","sandwich$url <- NULL"
-"0","sandwich$Local <- NULL"
-"0","sandwich$Direccion <- NULL"
-"0","sandwich$texto <- NULL"
-"0",""

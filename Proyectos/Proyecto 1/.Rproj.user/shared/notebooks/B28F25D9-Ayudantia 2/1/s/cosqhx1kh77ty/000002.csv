@@ -1,2 +1,0 @@
-"0","fh2020 <- primer_tiempo2020[order(primer_tiempo2020$accuratePass, decreasing = TRUE),]"
-"0","fh2020"

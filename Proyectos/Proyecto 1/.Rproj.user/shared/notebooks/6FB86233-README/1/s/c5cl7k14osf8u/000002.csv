@@ -1,7 +1,0 @@
-"0",""
-"0","#MDS"
-"0","d <- dist(iris_num) # distancias euclidianas entre entidades"
-"0","MDS <- cmdscale(d,eig=TRUE, k=2) # k es el numero de dimensiones de salida"
-"0",""
-"0","MDS$points %>% as.data.frame() %>% ggplot(aes(V1,V2, col=iris0$Species)) + geom_point()"
-"0",""

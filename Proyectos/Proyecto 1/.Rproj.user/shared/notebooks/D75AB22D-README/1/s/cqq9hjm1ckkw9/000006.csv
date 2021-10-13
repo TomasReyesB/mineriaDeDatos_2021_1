@@ -1,4 +1,0 @@
-"0",""
-"0","data <- read.csv(""rankingsATP.csv"")"
-"0",""
-"0","head(data)"
