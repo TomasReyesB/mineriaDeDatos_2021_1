@@ -1,0 +1,6 @@
+"0",""
+"0","ingredientes_nota <- data.frame(ingredientes_solos, notas, promedios)"
+"0","ingredientes_nota$ingredientes_solos = gsub(""  "", """", ingredientes_nota$ingredientes_solos)"
+"0",""
+"0",""
+"0",""
